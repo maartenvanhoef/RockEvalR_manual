@@ -1,0 +1,306 @@
+---
+title: "RockEvalR"
+author: "Maarten van Hoef"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(RockEvalR)
+```
+
+### 1 RockEvalR
+
+RockEvalR is an R-package developped by Maarten van Hoef to import and analyse raw data from the Rock-Eval 7S in R.
+<https://github.com/maartenvanhoef/RockEvalR>
+
+The package include functions to import data in the .B00 format.
+It is currently not possible to perform data callibration, therefore the data need to be have been processed by the Geoworks software first.
+
+All functions commence with RE_.
+
+### 2 Example file
+
+It is recommended to run the example file with your data to get used to the R-package.
+The steps are explained below.
+
+
+#### 2.1 Getting help
+
+The R-package includes documentation for all functions on both their use in R and also their relation to Rock-Eval data interpretation.
+
+```{r Getting help, message=FALSE, warning=FALSE}
+# Access the package overview page like:
+?RockEvalR
+
+# An index of all functions and help pages by:
+help(package=RockEvalR)
+
+# Or a access a specific function's help page like:
+?RE_Ccombined()
+```
+
+
+#### 2.2 Getting started
+
+First raw Rock-Eval 7S data need to be imported. The data need to be in a folder containing only Rock-Eval raw data files. RE_read will distinguish .B00 and .B00~.
+The raw data can be plotted including the base-lines and the cursors separating different pools of decomposition products.
+
+```{r dataloc, message=FALSE, warning=FALSE, include=FALSE}
+#1 Location of your RE data
+datalocation<-"//WURNET.NL/Homes/hoef006/My Documents/- Data/Verwerking/Rock-Eval/Raw data/Bulk3"
+
+
+```
+
+```{r Load, message=FALSE, warning=FALSE}
+
+# Load all data files in folder
+REdata<-RE_read(datalocation)
+
+# Plot first data file in read directory
+RE_plot(REdata,1)
+
+```
+
+
+#### 2.3 Converting data
+
+The raw signal data are not adjusted to the base-lines and the appropriate units.
+It is important to always convert the raw data to proper units before further calculations.
+
+
+```{r Convert, message=FALSE, warning=FALSE}
+
+# Convert raw RE data to values with proper units
+REdata.adj<-RE_convert(REdata)
+
+```
+
+#### 2.4 Adjusting the separation between organic and inorganic CO2.
+
+Based on experience with soil-like matrices we found the TOC-TIC determination was improved by adjusting the separation between the organic and inorganic part of the pyrolysed CO2.
+This is an optional step, and the relevance depends on the type of sample analysed.
+It is possible to plot the determination of the improved temperature for separation.
+
+```{r Adjust, message=FALSE, warning=FALSE}
+
+# Adjust the pyrolysis CO2 cursor 2 to the valley between OC and IC peaks (only for SOIL and SOIL TS cycles)
+REdata.adj<-RE_cursadjust(REdata.adj, plot = T)
+
+```
+
+
+#### 2.5 Calculating the standard Rock-Eval parameters.
+
+After the data are converted to the right units the standard Rock-Eval parameters can be calculated.
+The surfaces S1, S2, etc. are derived from integration of the measurement curves.
+The TOC, OI, etc. are calculated by the formulation of the Rock-Eval interpretation.
+(Baudin, 2023. The Rock‐Eval Method: Principles and Application)
+
+```{r Param, message=FALSE, warning=FALSE}
+
+# Calculate RE zones (S1, S2, ...)
+REdata.adj<-RE_surfaces(REdata.adj)
+
+# Compute the RE metrics (TOC, OI, ...)
+REdata.adj<-RE_metrics(REdata.adj)
+
+```
+
+#### 2.6 Additional Rock-Eval computations in RockEvalR.
+
+Additional calculations can be performed such as the I/R indices (Sebag 2016. Dynamics of soil organic matter based on new Rock-Eval indices).
+
+```{r Sebag, message=FALSE, warning=FALSE}
+
+# Determine Sebag et al. (2016) parameters
+REdata.adj<-RE_SebagIR(REdata.adj)
+
+# Calculate T percentiles (i.e., T25, T50, and T75)
+REdata.adj<-RE_Tpercentiles(REdata.adj)
+
+# Standard percentiles are T25, T50 and T75 but any custom vector can be used as:
+REdata.adj<-RE_Tpercentiles(REdata.adj, c(10,30,50,70,90))
+
+```
+
+#### 2.7 Sulphur computation
+
+The Rock-Eval 7S also allows for analysis of decomposed Sulphur-species.
+The sulphur data need to be integrated separately in RockEvalR.
+
+```{r Sulphur, message=FALSE, warning=FALSE}
+#12.1 Compute surfaces
+REdata.adj<-RE_Ssurfaces(REdata.adj)
+
+#12.2 Derive metrics for S
+REdata.adj<-RE_Smetrics(REdata.adj)
+
+# The sulphur metrics often depend on empirical corrections so it is adviced to read the functions help page before use.
+?RE_Smetrics()
+```
+
+#### 2.8 Advanced interpretation
+
+The main benefit of RockEvalR is that data can be further analysed and integrated using non-standard approaches.
+All data are by default stored in flexibles nested lists and can be adapted freely.
+Section 3 provides an alphabetical overview of additional functions included in RockEvalR. However, the user is free to further manipulate the data according to their needs.
+
+### 3 Functions included in RockEvalR
+
+#### RE_calculateall
+Combines all main functions in one go. Not recommended for first time use.
+RE_convert(), RE_surfaces(), RE_metrics(), 
+RE_SebagIR(), and RE_Tpercentiles().
+
+
+#### RE_Ccombined
+Combines the amount of C released of the different thermograms to calculate the flux of PC and RC over time.
+
+This function calculates the amount of released C at every time step (instead of integrating it over an entire period).
+The input needs to be data converted to the right units by using the function RE_convert().
+
+#### RE_convert
+This function derives the elemental amount using calibration, baseline and sample weight.
+
+It is important to convert the thermogram data to the right units, before using most other functions.
+This function performs the conversion using the callibration values and baseline.
+The input data should be the list of raw data files which is read by the function RE_read(dataloc).
+
+#### RE_cumtraparea
+This function does a step wise trapezoidal integration.
+
+#### RE_cursadjust
+This function adjusts the unaltered pyrolysis CO2 cursor which separates organic and inorganic C.
+The function alters only the samples that are run with the SOIL or SOIL TS cycle and only samples that have their cursor not manually adjusted already.
+
+A separation between organic and inorganic CO2 is made based on a temperature cut-off. By default this value is fixed at 400 C in Geoworks, however, for soils the valley between the two peaks may be more appropriate.
+Adjusting the temperature cut-off to the local minimum between the organic and inorganic peak may result in a more appropriate calculation of TOC and TIC.
+
+#### RE_customarea
+This function calculates the areas between a set of temperatures. Input should be converted already.
+The areas between all temperatures is given plus the area between t0 and the first temperature and the area after the highest temperature is reached.
+All output parameters have the same units as their fully integrated counterparts.
+
+It is important that first the data have been converted to the right units (by calibration values) and that the baseline is set to 0.
+Converting the raw measurements to proper units and baselined values can be done with the RE_convert() function.
+This function integrates any thermograms. Integration happens between the temperatures that are given as a vector argument in the function.
+The lowest temperature and highest temperatures should not be included in the argument vector.
+So vector c(300,450,500) will result in the integration: T < 300, T 300-450, T 450-500, and T > 500.
+
+#### RE_extracttable
+Creates a table with all calculated metrics added to the data.
+
+#### RE_metrics
+This function calculates main Rock-Eval metrics from zone areas.
+
+It is necessary that the RE surfaces have been integrated first.
+This can be done with the RE_surfaces() function.
+From these areas the basic Rock-Eval metrics are then computed.
+
+-  Tpeak, RE7 temperature at S2 peak (C)
+-  POC, pyrolysis organic C (%)
+-  ROC, residual organic C (%)
+-  TOC, total organic C (%)
+-  PIC, pyrolysis inorganic C (%)
+-  RIC, residual inorganic C (%)
+-  TIC, total inorganic C (%)
+-  HI, hydrogen index (mg CH/ g TOC)
+-  OI_CO, CO oxygen index (mg CO/ g TOC)
+-  OI_CO2, main oxygen index (mg CO2/ g TOC)
+-  OI_combi, combined oxygen index/ OIRE6 (mg O/ g TOC)
+
+
+#### RE_OHcombined
+Combines the amount of H and O released of the different thermograms to calculate their respective fluxes over time.
+
+This function calculates the amount of released H and O at every time step (instead of integrating it over an entire period).
+The input needs to be data converted to the right units by using the function RE_convert().
+The H and O released during pyrolysis originate from the sample, whereas the O released during oxidation also originates from the air in the oven.
+
+#### RE_plot
+This function previews Rock-Eval thermograms and cursors. Input contains a single Rock-Eval analysis.
+
+#### RE_read
+This function loads all Rock-Eval raw data files into a list.
+
+Before using any function the raw Rock-Eval data need to be read into the right format.
+This format is a list that contains a list for each sample with all appropriate data.
+
+This function will read all files in the indicated data location. It's important only raw Rock-Eval data are stored in that location.
+The function will only use .B00 files, .B00~ files are ignored.
+If data are erroneously read this may result from parameters missing, parameters being in an unexpected location in the file, or from additional unexpected data being part of the file.
+This can usually be helped by reading the fresh raw data (e.g., the .B00~ file) into an updated version of Geoworks.
+Reading of data files after Geoworks conversion was last checked for version: V1.8R1.
+
+#### RE_SebagIR
+Calculates the areas A1, A2, A3, A4 plus the I and R indices.
+(Sebag, 2016. Dynamics of soil organic matter based on new Rock-Eval indices)
+
+#### RE_Smetrics
+It is necessary that the RE Sulphur surfaces have been integrated first.
+This can be done with the RE_Ssurfaces() function.
+Additionally, for the sulphur index (SI) the total C has to be determined with the RE_surfaces() function.
+From these areas the basic Rock-Eval metrics are then computed.
+The determination of most sulphur-species depends on empirical correction of matrix effects.
+Based on type of sample (e.g., Kerogen type), and data availability different empirical adjustments may lead to better results.
+
+In this case total organic S is calculated from a relationship with the Tmax_CH during pyrolysis:
+
+(Pyrolysed org S) / (Total org S) = (org.conversion.a) x (Tmax_CH) + (org.conversion.b)
+
+(Total inorg S) = (Total S) - (Total org S)
+
+- Tpeak_S, RE7 temperature at organic SO2 peak during pyrolysis (C)
+- POS, pyrolysis organic S (%)
+- PIS, pyrolysis inorganic S (%)
+- RTS, total oxidised S (%)
+- TS, total measured S (%)
+- PyOS.emp, emperically determined ratio of pyrolysed organic S (%)
+- ROS.cor, empirically corrected residual organic S (%)
+- TOS.cor, empirically corrected total organic S (%)
+- RIS.cor, empirically corrected residual inorganic S (%)
+- TIS.cor, empirically corrected total inorganic S (%)
+- SI, sulphur index (mg total org. S/ g TOC)
+- SI.pyr, labile sulphur index (mg pyrolysed org. S/ g TOC)
+
+
+#### RE_Ssurfaces
+This function calculates the areas of the different Rock-Eval zones for Sulphur. Input should be converted already. As an option the zones can also be included as a time series.
+It is important that first the data have been converted to the right units (by calibration values) and that the baseline is set to 0.
+Converting the raw measurements to proper units and baselined values can be done with the RE_convert() function.
+This function integrates the different thermograms for S. Integration happens between the cursors that were determined automatically or manually adjusted.
+Here the areas and nomenclature of Cohen-Sadon et al. (2022) are used instead of those in Geoworks. However, the cut-off temperatures are not fixed an based on the cursors and local minima.
+
+- S1S, pyrolysed before start of the heating ramp
+- S2S, pyrolysed from start of heating until minimum between 400 and 550 C
+- S3S, pyrolysed after minimum between 400 and 550 C
+- S4S, oxidised below minimum between 550 and 650 C
+- S5S, oxidised above minimum between 550 and 650 C
+
+#### RE_surfaces
+This function calculates the areas of the different Rock-Eval zones. Input should be converted already. As an option the zones can also be included as a time series.
+
+It is important that first the data have been converted to the right units (by calibration values) and that the baseline is set to 0.
+Converting the raw measurements to proper units and baselined values can be done with the RE_convert() function.
+This function integrates the different thermograms for C. Integration happens between the cursors that were determined automatically or manually adjusted.
+The cursors are normally determined by Geoworks. Manual adjustment of the S3 organic-inorganic separation for the soil program can be done with the RE_cursadjust() function.
+
+- S1, Free hydrocarbons (mg HC/g)
+- S2, Pyrolysable hydrocarbons (mg HC/g)
+- S3CO, Pyrolysable organic CO (mg CO/g)
+- SS3COi, Pyrolysable inorganic CO (mg CO/g)
+- SS3CO2, Pyrolysable organic CO2 (mg CO2/g)
+- SS3CO2i, Pyrolysable organic CO2 (mg CO2/g)
+- SS4CO, Oxidised organic CO (mg CO/g)
+- SS4COi, Oxidised inorganic CO (mg CO/g)
+- SS4CO2, Oxidised organic CO2 (mg CO2/g)
+- SS5, Oxidised inorganic CO2 (mg CO2/g)
+
+#### RE_Tpercentiles
+Calculates the temperature percentiles of the thermograms.
+
+#### RE_traparea
+This function does a simplified trapezoidal integration.
